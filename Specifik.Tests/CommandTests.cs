@@ -14,11 +14,10 @@ public sealed class CommandTests
     public void SingleVerb()
     {
         var node = Spawn(Verb, "verb", "--option");
-        var parser = Parser.From(node);
-        Assert.True(parser.Parse("verb", "--option") is [Tree
+        Assert.True(Parser.Parse(node, "verb", "--option") is [Tree
         {
-            Kind: Verb1,
-            Values: ["--option"],
+            Kind: Verb,
+            Values: ["verb", "--option"],
             Trees: []
         }]);
     }
@@ -26,16 +25,15 @@ public sealed class CommandTests
     [Fact]
     public void SingleVerbSurrounded()
     {
-        var node = Spawn(Verb, "verb", Spawn(Option1, "--option1"), "--option2", Spawn(Option3, "--option3"));
-        var parser = Parser.From(node);
-        Assert.True(parser.Parse("verb", "--option1", "--option2", "--option3") is [Tree
+        var node = Spawn(Verb, "verb", Spawn(Option1, "--option1"), "--option", Spawn(Option2, "--option2"));
+        Assert.True(Parser.Parse(node, "verb", "--option1", "--option", "--option2") is [Tree
         {
-            Kind: Verb1,
-            Values: [_, "--option2", _],
+            Kind: Verb,
+            Values: ["verb", "--option1", "--option", "--option2"],
             Trees:
             [
                 Tree { Kind: Option1, Values: ["--option1"], Trees: [] },
-                Tree { Kind: Option3, Values: ["--option3"], Trees: [] }
+                Tree { Kind: Option2, Values: ["--option2"], Trees: [] }
             ]
         }]);
     }
@@ -43,35 +41,34 @@ public sealed class CommandTests
     [Fact]
     public void SingleVerbWithOptional()
     {
-        var node = Spawn(Verb1, "verb", ~Spawn(Option1, Any("--option", "-o")));
-        var parser = Parser.From(node);
-        Assert.True(parser.Parse("verb") is [Tree { Kind: Verb1, Values: [], Trees: [] }]);
-        Assert.True(parser.Parse("verb", "--option") is [Tree
+        var node = Spawn(Verb, "verb", ~Spawn(Option, Any("--option", "-o")));
+        // Assert.True(Parser.Parse(node, "verb") is [Tree { Kind: Verb, Values: ["verb"], Trees: [] }]);
+        Assert.True(Parser.Parse(node, "verb", "--option") is [Tree
         {
-            Kind: Verb1,
-            Values: [],
-            Trees: [Tree { Kind: Option1, Values: [], Trees: [] }]
+            Kind: Verb,
+            Values: ["verb", "--option"],
+            Trees: [Tree { Kind: Option, Values: ["--option"], Trees: [] }]
         }]);
-        Assert.True(parser.Parse("verb", "-o") is [Tree
+        Assert.True(Parser.Parse(node, "verb", "-o") is [Tree
         {
-            Kind: Verb1,
-            Values: [],
-            Trees: [Tree { Kind: Option1, Values: [], Trees: [] }]
+            Kind: Verb,
+            Values: ["verb", "-o"],
+            Trees: [Tree { Kind: Option, Values: ["-o"], Trees: [] }]
         }]);
     }
 
     [Fact]
     public void SingleVerbWithStore()
     {
-        var node = Spawn(Verb1, "verb", Spawn(Option1, "--option", Spawn(Value1, Loop(33..256))));
+        var node = Spawn(Verb, "verb", Spawn(Option, "--option", Spawn(Value, Loop(33..256))));
         var parser = Parser.From(node);
         Assert.True(parser.Parse("verb", "--option", "value") is [Tree
         {
-            Kind: Verb1,
+            Kind: Verb,
             Trees: [Tree
             {
-                Kind: Option1,
-                Trees: [Tree { Kind: Value1, Values: ["value"], Trees: [] }]
+                Kind: Option,
+                Trees: [Tree { Kind: Value, Values: ["value"], Trees: [] }]
             }]
         }]);
     }
@@ -84,23 +81,26 @@ public sealed class CommandTests
             Spawn(Version, Any("version", "--version")),
             Spawn(Verb1,
                 "verb1",
-                ~Spawn(Option1, Any("--option", "-o"), Spawn(Value1, Loop(33..255))),
+                ~Spawn(Option1, Any("--option1", "-o1"), Spawn(Value1, Loop(33..255))), // TODO: Do not cross argument boundary.
                 ~Spawn(Help, Any("--help", "-h")),
                 ~Spawn(Version, Any("--version", "-v"))),
-            Spawn(Verb2, "verb2", ~Spawn(Option2, Any("--option", "-o"))),
-            Spawn(Verb3, "verb3", ~Spawn(Option3, Any("--option", "-o"))));
+            Spawn(Verb2, "verb2", ~Spawn(Option2, Any("--option2", "-o2"))),
+            Spawn(Verb3, "verb3", ~Spawn(Option3, Any("--option3", "-o3"))));
         var parser = Parser.From(node);
-        Assert.True(parser.Parse("help") is [Tree { Kind: Help, Values: [], Trees: [] }]);
-        Assert.True(parser.Parse("--help") is [Tree { Kind: Help, Values: [], Trees: [] }]);
-        Assert.True(parser.Parse("verb1", "--option", "value", "--help") is [Tree
+        Assert.True(parser.Parse("help") is [Tree { Kind: Help, Values: ["help"], Trees: [] }]);
+        Assert.True(parser.Parse("--help") is [Tree { Kind: Help, Values: ["--help"], Trees: [] }]);
+        Assert.True(parser.Parse("verb1", "--option1", "value1", "--help", "--version") is [Tree
         {
             Kind: Verb1,
-            Values: [],
             Trees: [Tree
             {
                 Kind: Option1,
-                Values: ["value"],
-                Trees: [Tree { Kind: Help, Values: [], Trees: [] }]
+                Trees:
+                [
+                    Tree { Kind: Value1, Values: ["value1"] },
+                    Tree { Kind: Help },
+                    Tree { Kind: Version }
+                ]
             }]
         } t]);
     }

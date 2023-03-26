@@ -60,10 +60,16 @@ public abstract record Node
     }
     public sealed record Text(string Value) : Node
     {
-        public override string ToString() => $@"""{Value.Replace("\0", "\\0")}""";
+        public override string ToString() => $@"""{Value}""";
     }
-    public sealed record Push(string Value) : Node;
-    public sealed record Pop : Node;
+    public sealed record Push(string Value) : Node
+    {
+        public override string ToString() => $@"{nameof(Push)}(""{Value}"")";
+    }
+    public sealed record Pop : Node
+    {
+        public override string ToString() => nameof(Pop);
+    }
 
     public static implicit operator Node(bool value) => value ? _true : _false;
     public static implicit operator Node(char value) => new Text($"{value}");

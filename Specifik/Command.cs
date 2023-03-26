@@ -50,44 +50,40 @@ public sealed class Option
 
 public sealed class Parser
 {
+    public static Tree[] Parse(Node node, params string[] arguments) => From(node).Parse(arguments);
+
     public static Parser From(Node node)
     {
         var build = new Build(new(), new(), new());
         node = node.Descend(node => node, node => Identify(node, build));
         var references = new Parse?[build.Nodes.Count];
-        for (int i = 0; i < build.Nodes.Count; i++) references[i] = Next(build.Nodes[i]!, references);
-        var root = Next(node, references);
-        return new(root, references!);
+        for (int i = 0; i < build.Nodes.Count; i++) references[i] = Next(build.Nodes[i]!);
+        return new(Next(node), references!);
 
-        static Parse Next(Node node, Parse?[] references)
+        static Parse Next(Node node)
         {
             switch (node)
             {
                 case True: return (ref State _) => true;
                 case False: return (ref State _) => false;
                 case And and:
-                    var all = and.Flatten().Select(node => Next(node, references)).ToArray();
+                    var all = and.Flatten().Select(Next).ToArray();
                     return (ref State state) =>
                     {
                         foreach (var parser in all) if (parser(ref state) == false) return false;
                         return true;
                     };
                 case Or or:
-                    var any = or.Flatten().Select(node => Next(node, references)).ToArray();
+                    var any = or.Flatten().Select(Next).ToArray();
                     return (ref State state) =>
                     {
                         foreach (var parser in any)
                         {
-                            var local = state with
-                            {
-                                Stack = new(state.Stack),
-                                Trees = new(state.Trees)
-                            };
-                            if (parser(ref local))
-                            {
-                                state = local;
-                                return true;
-                            }
+                            var stack = state.Stack.Count;
+                            var trees = state.Trees.Count;
+                            if (parser(ref state)) return true;
+                            while (state.Stack.Count > stack) state.Stack.Pop();
+                            while (state.Trees.Count > trees) state.Trees.Pop();
                         }
                         return false;
                     };
@@ -176,12 +172,12 @@ public sealed class Parser
         }
     }
 
-    readonly Parse _parse;
+    readonly Parse _root;
     readonly Parse[] _references;
 
     Parser(Parse root, Parse[] references)
     {
-        _parse = root;
+        _root = root;
         _references = references;
     }
 
@@ -194,7 +190,7 @@ public sealed class Parser
             References = _references,
             Trees = new(),
         };
-        if (_parse(ref state) && state.Argument == state.Arguments.Length)
+        if (_root(ref state) && state.Argument == state.Arguments.Length)
             return state.Trees.Select(pair => pair.tree).ToArray();
         else
             return Array.Empty<Tree>();
