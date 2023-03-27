@@ -80,11 +80,12 @@ public sealed class ParseTests
             Spawn(Version, Any(Word("version"), Word("--version"))),
             Spawn(Verb1,
                 Word("verb1"),
-                ~Spawn(Option1, Any(Word("--option1"), Word("-o1")), Spawn(Value1, Loop(32..256))),
-                ~Spawn(Help, Any(Word("--help"), Word("-h"))),
-                ~Spawn(Version, Any(Word("--version"), Word("-v")))),
-            Spawn(Verb2, Word("verb2"), ~Spawn(Option2, Any(Word("--option2"), Word("-o2")))),
-            Spawn(Verb3, Word("verb3"), ~Spawn(Option3, Any(Word("--option3"), Word("-o3")))));
+                Loop(Any(
+                    ~Spawn(Option1, Any(Word("--option1"), Word("-o1")), Spawn(Value1, Loop(32..256))),
+                    ~Spawn(Help, Any(Word("--help"), Word("-h"))),
+                    ~Spawn(Version, Any(Word("--version"), Word("-v")))))),
+            Spawn(Verb2, Word("verb2"), Loop(~Spawn(Option2, Any(Word("--option2"), Word("-o2"))))),
+            Spawn(Verb3, Word("verb3"), Loop(~Spawn(Option3, Any(Word("--option3"), Word("-o3"))))));
         Assert.True(Parser.Parse(node, "help") is [Tree { Kind: Help, Values: ["help"], Trees: [] }]);
         Assert.True(Parser.Parse(node, "--help") is [Tree { Kind: Help, Values: ["--help"], Trees: [] }]);
         Assert.True(Parser.Parse(node, "verb1", "--option1", "value1", "--help", "--version") is [Tree

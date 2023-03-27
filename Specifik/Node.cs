@@ -60,7 +60,7 @@ public abstract record Node
     }
     public sealed record Text(string Value) : Node
     {
-        public override string ToString() => $@"""{Value}""";
+        public override string ToString() => $@"""{Value.Replace("\0", "")}""";
     }
     public sealed record Push(string Value) : Node
     {
@@ -104,8 +104,8 @@ public abstract record Node
     {
         var identifier = Identifier.Next();
         var refer = new Refer(identifier);
-        var child = Option(All(nodes), refer);
-        var define = new Define(identifier, child);
+        var node = Option(All(nodes), refer);
+        var define = new Define(identifier, node);
         return new And(define, refer);
     }
 

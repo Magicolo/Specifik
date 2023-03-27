@@ -6,6 +6,7 @@ namespace Specifik.Command;
 public sealed record Error(string Message);
 public sealed record Help;
 public sealed record Version;
+public sealed record Unrecognized;
 
 public sealed class Command
 {
@@ -13,7 +14,11 @@ public sealed class Command
     public string? Help { get; init; }
     public Verb[] Verbs { get; init; } = Array.Empty<Verb>();
 
-    public Node Node() => Any(Verbs.Append(new Verb<Help>()).Append(new Verb<Version>()).Select(verb => verb.Node()));
+    public Node Node() => Any(Verbs
+        .Append(new Verb<Help>())
+        .Append(new Verb<Version>())
+        .Select(verb => verb.Node())
+        .Append(Spawn(nameof(Unrecognized), Loop(33..256))));
     public object Parse(params string[] arguments) => Convert(Parser.Parse(Node(), arguments));
 
     public object Convert(params Tree[] trees)
@@ -47,7 +52,7 @@ public sealed class Verb<T> : Verb where T : new()
 {
     public override Node Node() => Spawn(typeof(T).Name,
         Any(Word(typeof(T).Name), Any(Names.Select(Word))),
-        Any(Options.Select(option => option.Node())));
+        Loop(Any(Options.Select(option => option.Node()).Append(Spawn(nameof(Unrecognized), Loop(33..256))))));
 
     public override object Convert(Tree tree)
     {
@@ -79,6 +84,6 @@ public sealed class Option<T> : Option
         if (string.IsNullOrWhiteSpace(Name)) throw new ArgumentException(nameof(Name));
         return Spawn(Name,
             Any(Word($"--{Name}"), Any(Names.Select(name => Word($"--{name}"))), Any(Shorts.Select(name => Word($"-{name}")))),
-            Spawn(typeof(T).Name, Loop(32..256)));
+            Spawn(typeof(T).Name, Loop(33..256)));
     }
 }
