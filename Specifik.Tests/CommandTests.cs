@@ -58,7 +58,7 @@ public sealed class CommandTests
     }
 
     [Fact]
-    public void SingleVerbWithStore()
+    public void SingleVerbWithSpawn()
     {
         var node = Spawn(Verb, "verb", Spawn(Option, "--option", Spawn(Value, Loop(33..256))));
         var parser = Parser.From(node);
@@ -81,7 +81,7 @@ public sealed class CommandTests
             Spawn(Version, Any("version", "--version")),
             Spawn(Verb1,
                 "verb1",
-                ~Spawn(Option1, Any("--option1", "-o1"), Spawn(Value1, Loop(33..255))), // TODO: Do not cross argument boundary.
+                ~Spawn(Option1, Any("--option1", "-o1"), Spawn(Value1, Loop(33..255))),
                 ~Spawn(Help, Any("--help", "-h")),
                 ~Spawn(Version, Any("--version", "-v"))),
             Spawn(Verb2, "verb2", ~Spawn(Option2, Any("--option2", "-o2"))),
@@ -92,16 +92,12 @@ public sealed class CommandTests
         Assert.True(parser.Parse("verb1", "--option1", "value1", "--help", "--version") is [Tree
         {
             Kind: Verb1,
-            Trees: [Tree
-            {
-                Kind: Option1,
-                Trees:
-                [
-                    Tree { Kind: Value1, Values: ["value1"] },
-                    Tree { Kind: Help },
-                    Tree { Kind: Version }
-                ]
-            }]
-        } t]);
+            Trees:
+            [
+                Tree { Kind: Option1, Trees: [Tree { Kind: Value1, Values: ["value1"] }] },
+                Tree { Kind: Help },
+                Tree { Kind: Version }
+            ]
+        }]);
     }
 }

@@ -12,11 +12,11 @@ readonly record struct Build(
     List<Node?> Nodes);
 
 record struct State(
-    int Argument,
+    int Source,
     int Index,
-    Stack<(int argument, int index, string kind)> Stack,
+    Stack<(int source, int index, string kind)> Stack,
     Stack<(Tree tree, int depth)> Trees,
-    string[] Arguments,
+    string[] Sources,
     Parse[] References);
 
 public sealed class Command
@@ -50,12 +50,12 @@ public sealed class Option
 
 public sealed class Parser
 {
-    public static Tree[] Parse(Node node, params string[] arguments) => From(node).Parse(arguments);
+    public static Tree[] Parse(Node node, params string[] sources) => From(node).Parse(sources);
 
     public static Parser From(Node node)
     {
         var build = new Build(new(), new(), new());
-        node = node.Descend(node => node, node => Identify(node, build));
+        node = node.Descend(_ => _, node => Identify(node, build));
         var references = new Parse?[build.Nodes.Count];
         for (int i = 0; i < build.Nodes.Count; i++) references[i] = Next(build.Nodes[i]!);
         return new(Next(node), references!);
@@ -91,7 +91,7 @@ public sealed class Parser
                 case Push(var kind):
                     return (ref State state) =>
                     {
-                        state.Stack.Push((state.Argument, state.Index, kind));
+                        state.Stack.Push((state.Source, state.Index, kind));
                         return true;
                     };
                 case Pop:
@@ -109,10 +109,10 @@ public sealed class Parser
                             trees.Reverse();
 
                             var values = new List<string>();
-                            for (int i = frame.argument; i <= state.Argument && i < state.Arguments.Length; i++)
+                            for (int i = frame.source; i <= state.Source && i < state.Sources.Length; i++)
                             {
-                                var argument = state.Arguments[i];
-                                var value = i == state.Argument ? argument[frame.index..state.Index] : argument[frame.index..];
+                                var source = state.Sources[i];
+                                var value = i == state.Source ? source[frame.index..state.Index] : source[frame.index..];
                                 if (value.Length > 0) values.Add(value);
                                 frame.index = 0;
                             }
@@ -122,21 +122,23 @@ public sealed class Parser
                         else return false;
                     };
                 case Text(var text):
+                    var splits = text.Split('\0');
                     return (ref State state) =>
                     {
-                        if (state.Argument < state.Arguments.Length &&
-                            state.Arguments[state.Argument] is var argument &&
-                            argument.AsSpan(state.Index).Trim().StartsWith(text))
+                        for (int i = 0; i < splits.Length; i++)
                         {
-                            state.Index += text.Length;
-                            if (state.Index == argument.Length)
+                            var split = splits[i];
+                            if (state.Sources.TryAt(state.Source, out var source))
                             {
-                                state.Index = 0;
-                                state.Argument += 1;
+                                if (split == "" && state.Index == source.Length)
+                                    (state.Source, state.Index) = (state.Source + 1, 0);
+                                else if (source.AsSpan(state.Index).StartsWith(split))
+                                    state.Index += split.Length;
+                                else
+                                    return false;
                             }
-                            return true;
                         }
-                        return false;
+                        return true;
                     };
                 default: throw new NotImplementedException();
             }
@@ -153,7 +155,7 @@ public sealed class Parser
 
         static Node Identify(Node node, Build build)
         {
-            switch (node.Boolean())
+            switch (node.Normalize())
             {
                 case Define(var identifier, var child): Define(child, identifier, build); return true;
                 case Refer(var identifier): return new Refer(new Identifier.Index(Index(identifier, build)));
@@ -181,18 +183,9 @@ public sealed class Parser
         _references = references;
     }
 
-    public Tree[] Parse(params string[] arguments)
+    public Tree[] Parse(params string[] sources)
     {
-        var state = new State()
-        {
-            Arguments = arguments,
-            Stack = new(),
-            References = _references,
-            Trees = new(),
-        };
-        if (_root(ref state) && state.Argument == state.Arguments.Length)
-            return state.Trees.Select(pair => pair.tree).ToArray();
-        else
-            return Array.Empty<Tree>();
+        var state = new State(0, 0, new(), new(), sources.Select(source => source.Trim()).ToArray(), _references);
+        return _root(ref state) ? state.Trees.Select(pair => pair.tree).ToArray() : Array.Empty<Tree>();
     }
 }

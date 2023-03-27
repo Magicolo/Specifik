@@ -73,7 +73,7 @@ public abstract record Node
 
     public static implicit operator Node(bool value) => value ? _true : _false;
     public static implicit operator Node(char value) => new Text($"{value}");
-    public static implicit operator Node(string value) => new Text(value);
+    public static implicit operator Node(string value) => new Text($"\0{value}\0");
     public static implicit operator Node(Range value) => Any(Enumerable
         .Range(value.Start.Value, value.End.Value - value.Start.Value)
         .Select(value => new Text($"{(char)value}"))
@@ -128,18 +128,31 @@ public abstract record Node
 
     public Node Descend(Func<Node, Node> down, Func<Node, Node> up) => up(down(this).Map(node => node.Descend(down, up)));
 
-    /// True & a => a, a & True => a, False & a => False, a & False => False,
-    /// a | a => a, False | a => a, a | False => a, True | a => a | True
-    public Node Boolean() => this switch
+    /// <summary>
+    /// Applies the following transformations:
+    /// - True & x => x
+    /// - x & True => x
+    /// - False & x => False
+    /// - x & False => False
+    /// - x | x => x
+    /// - False | x => x
+    /// - x | False => x
+    /// - True | x => x | True
+    /// - Text("") => True
+    /// - Text(x) & Text(y) => Text(x + y)
+    /// </summary>
+    public Node Normalize() => this switch
     {
         And(True, var right) => right,
         And(var left, True) => left,
-        And(False, _) => false,
-        And(_, False) => false,
+        And(False, _) => _false,
+        And(_, False) => _false,
         Or(var left, var right) when left == right => left,
         Or(var left, False) => left,
         Or(False, var right) => right,
-        Or(True, var right) => new Or(right, true),
+        Or(True, var right) => new Or(right, _true),
+        Text("") => _true,
+        And(Text(var left), Text(var right)) => new Text(left + right),
         _ => this,
     };
 }
