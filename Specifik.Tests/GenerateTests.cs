@@ -33,7 +33,9 @@ public sealed class GenerateTests
                 }
             }
         }.Node();
-        var a = Enumerable.Repeat(0, 100).Select(_ => Generator.Generate(node)).ToArray();
-        var b = a.Select(arguments => Parser.Parse(node, arguments)).ToArray();
+        var parser = Parser.From(node);
+        var generator = Generator.From(node);
+        var a = Enumerable.Repeat(0, 100).Select(_ => generator.Generate()).ToArray();
+        var b = a.Select(text => text is null ? null : parser.Parse(text)).ToArray();
     }
 }

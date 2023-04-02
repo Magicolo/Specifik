@@ -11,7 +11,7 @@ delegate bool Generate(ref State state);
 
 public sealed class Generator
 {
-    public static string[] Generate(Node node) => From(node).Generate();
+    public static string? Generate(Node node) => From(node).Generate();
 
     public static Generator From(Node node)
     {
@@ -120,10 +120,10 @@ public sealed class Generator
         _references = references;
     }
 
-    public string[] Generate()
+    public string? Generate()
     {
         var state = new State(new(), new(), _references);
-        if (_root(ref state)) return state.Builder.ToString().Split('\0', StringSplitOptions.RemoveEmptyEntries);
-        else return Array.Empty<string>();
+        if (_root(ref state)) return state.Builder.ToString();
+        else return null;
     }
 }
